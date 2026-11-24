@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  test-and-build:
+  unit-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,8 +18,37 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      - name: Test
+      - name: Unit Tests
         run: go test -race -v ./...
 
       - name: Build
         run: go build -o bin/chguard ./cmd/chguard
+
+  e2e-clickhouse:
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        env:
+          CLICKHOUSE_PASSWORD: ci
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run E2E Suite against live ClickHouse
+        env:
+          CLICKHOUSE_HOST: http://localhost:8123
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci
+        run: go test -tags=e2e -v ./tests/...
