@@ -1,0 +1,5 @@
+/bin/
+/chguard
+chguard-report.md
+*.out
+.DS_Store

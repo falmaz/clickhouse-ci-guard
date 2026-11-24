@@ -1,0 +1,78 @@
+name: 'ClickHouse CI Guard'
+description: 'Fast, automated ClickHouse and dbt query performance linter for CI pipelines'
+author: 'falmaz'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  clickhouse_host:
+    description: 'ClickHouse HTTP URL'
+    required: false
+    default: 'http://localhost:8123'
+  clickhouse_user:
+    description: 'ClickHouse Username'
+    required: false
+    default: 'default'
+  clickhouse_password:
+    description: 'ClickHouse Password'
+    required: false
+    default: ''
+  clickhouse_database:
+    description: 'ClickHouse Database'
+    required: false
+    default: 'default'
+  dir:
+    description: 'Directory containing compiled .sql queries (e.g. target/compiled/)'
+    required: false
+    default: 'target/compiled/'
+  files:
+    description: 'Comma-separated list of SQL files to check'
+    required: false
+    default: ''
+  max_rows:
+    description: 'Maximum allowed estimated rows scanned per query'
+    required: false
+    default: '10000000'
+  max_parts:
+    description: 'Maximum allowed parts scanned per query'
+    required: false
+    default: '100'
+  fail_on_error:
+    description: 'Fail the GitHub Action if severe violations are found'
+    required: false
+    default: 'true'
+  output_markdown:
+    description: 'Filepath to write the GitHub PR comment markdown'
+    required: false
+    default: 'chguard-report.md'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: false
+
+    - name: Build chguard binary
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        go build -o "${{ runner.temp }}/chguard" ./cmd/chguard
+
+    - name: Run ClickHouse CI Guard
+      shell: bash
+      run: |
+        "${{ runner.temp }}/chguard" \
+          -host="${{ inputs.clickhouse_host }}" \
+          -user="${{ inputs.clickhouse_user }}" \
+          -password="${{ inputs.clickhouse_password }}" \
+          -database="${{ inputs.clickhouse_database }}" \
+          -dir="${{ inputs.dir }}" \
+          -files="${{ inputs.files }}" \
+          -max-rows="${{ inputs.max_rows }}" \
+          -max-parts="${{ inputs.max_parts }}" \
+          -fail-on-error="${{ inputs.fail_on_error }}" \
+          -output-markdown="${{ inputs.output_markdown }}"
